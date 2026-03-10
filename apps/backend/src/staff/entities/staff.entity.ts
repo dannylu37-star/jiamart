@@ -1,0 +1,15 @@
+import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn } from 'typeorm';
+
+@Entity('sp_staff')
+export class Staff {
+  @PrimaryGeneratedColumn() id: number;
+  @Column({ nullable: true }) position: string;
+  @Column({ nullable: true }) name: string;
+  @Column({ nullable: true }) mobile: string;
+  @Column({ name: 'start_time', nullable: true }) startTime: string;
+  @Column({ name: 'end_time', nullable: true }) endTime: string;
+  @Column({ nullable: true }) address: string;
+  @Column({ default: true }) status: boolean;
+  @Column({ name: 'staff_code', nullable: true }) staffCode: string;
+  @CreateDateColumn({ name: 'created_at' }) createdAt: Date;
+}

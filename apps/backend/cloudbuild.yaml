@@ -1,0 +1,33 @@
+steps:
+  - name: 'gcr.io/cloud-builders/docker'
+    args:
+      - 'build'
+      - '-t'
+      - 'europe-west2-docker.pkg.dev/jiamart/jiamart/backend:$COMMIT_SHA'
+      - '-t'
+      - 'europe-west2-docker.pkg.dev/jiamart/jiamart/backend:latest'
+      - '.'
+  - name: 'gcr.io/cloud-builders/docker'
+    args: ['push', 'europe-west2-docker.pkg.dev/jiamart/jiamart/backend:$COMMIT_SHA']
+  - name: 'gcr.io/cloud-builders/docker'
+    args: ['push', 'europe-west2-docker.pkg.dev/jiamart/jiamart/backend:latest']
+  - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
+    entrypoint: gcloud
+    args:
+      - 'run'
+      - 'deploy'
+      - 'jiamart-backend'
+      - '--image=europe-west2-docker.pkg.dev/jiamart/jiamart/backend:$COMMIT_SHA'
+      - '--region=europe-west2'
+      - '--platform=managed'
+      - '--allow-unauthenticated'
+      - '--memory=512Mi'
+      - '--add-cloudsql-instances=jiamart:europe-west2:jiamart'
+      - '--set-secrets=DB_PASSWORD=jiamart-db-password:latest,JWT_SECRET=jiamart-jwt-secret:latest'
+      - '--set-env-vars=NODE_ENV=production,DB_HOST=/cloudsql/jiamart:europe-west2:jiamart,DB_USERNAME=jiamart,DB_NAME=jiamart_shop,OPS_DB_NAME=jiamart_ops,DB_PORT=3306'
+      - '--project=jiamart'
+images:
+  - 'europe-west2-docker.pkg.dev/jiamart/jiamart/backend:$COMMIT_SHA'
+  - 'europe-west2-docker.pkg.dev/jiamart/jiamart/backend:latest'
+options:
+  logging: CLOUD_LOGGING_ONLY
