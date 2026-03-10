@@ -3,12 +3,10 @@ import { InjectConnection } from '@nestjs/typeorm';
 import { Connection } from 'typeorm';
 import * as path from 'path';
 import * as fs from 'fs';
-import { Storage } from '@google-cloud/storage';
 import { VendorOrderForm } from './entities/vendor-order-form.entity';
 import { VendorProduct } from './entities/vendor-product.entity';
 
-const GCS_BUCKET = process.env.GCS_BUCKET || 'jiamart-files';
-const storage = new Storage();
+const UPLOAD_BASE = process.env.UPLOAD_DIR || path.join(process.cwd(), 'uploads');
 
 @Injectable()
 export class VendorFormService {
@@ -18,22 +16,17 @@ export class VendorFormService {
 
   async saveUpload(vendorId: number, file: any): Promise<VendorOrderForm> {
     const repo = this.opsConnection.getRepository(VendorOrderForm);
-    let storagePath = file.path; // local path (used in dev)
-
-    // 生产环境上传到 GCS
-    if (process.env.NODE_ENV === 'production') {
-      const gcsPath = `vendor-forms/${vendorId}/${Date.now()}-${file.originalname}`;
-      await storage.bucket(GCS_BUCKET).upload(file.path, { destination: gcsPath });
-      storagePath = `gs://${GCS_BUCKET}/${gcsPath}`;
-      // 删除本地临时文件
-      try { fs.unlinkSync(file.path); } catch {}
-    }
+    // 统一本地存储（Mac Mini 本地部署）
+    const destDir = path.join(UPLOAD_BASE, 'vendor-forms', String(vendorId));
+    fs.mkdirSync(destDir, { recursive: true });
+    const destPath = path.join(destDir, `${Date.now()}-${file.originalname}`);
+    fs.renameSync(file.path, destPath);
 
     return repo.save(
       repo.create({
         vendor_id: vendorId,
         original_filename: file.originalname,
-        storage_path: storagePath,
+        storage_path: destPath,
         status: 'pending',
       }),
     );
@@ -54,12 +47,7 @@ export class VendorFormService {
     let localPath = form.storage_path;
 
     try {
-      // 如果是 GCS 路径，先下载到 /tmp
-      if (form.storage_path.startsWith('gs://')) {
-        const gcsPath = form.storage_path.replace(`gs://${GCS_BUCKET}/`, '');
-        localPath = `/tmp/vendor-form-${formId}${ext}`;
-        await storage.bucket(GCS_BUCKET).file(gcsPath).download({ destination: localPath });
-      }
+      // 文件直接在本地，无需下载
 
       if (ext === '.xlsx' || ext === '.xls') {
         const XLSX = require('xlsx');
@@ -78,11 +66,6 @@ export class VendorFormService {
         // TODO: PDF 解析 — 接 LLM 或 pdf-parse
         this.logger.warn(`PDF parsing not yet implemented for form ${formId}`);
         parsedData = [];
-      }
-
-      // 清理临时文件
-      if (form.storage_path.startsWith('gs://')) {
-        try { fs.unlinkSync(localPath); } catch {}
       }
 
       await repo.update(formId, { status: 'parsed', parsed_data: parsedData });
