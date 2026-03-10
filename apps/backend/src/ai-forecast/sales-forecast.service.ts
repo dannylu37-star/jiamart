@@ -32,14 +32,14 @@ export class SalesForecastService {
     const daily: Array<{ sale_date: string; revenue: string; orders: string }> =
       await this.opsConnection.query(`
         SELECT
-          DATE(created_at) AS sale_date,
-          SUM(total_amount) AS revenue,
+          DATE(COALESCE(created_at, post_time)) AS sale_date,
+          SUM(COALESCE(total_amount, needPayMoney, 0)) AS revenue,
           COUNT(*) AS orders
         FROM jiamart_shop.sp_order
         WHERE payment_status = 'succeeded'
-          AND created_at >= DATE_SUB(CURDATE(), INTERVAL 90 DAY)
+          AND COALESCE(created_at, post_time) >= DATE_SUB(CURDATE(), INTERVAL 90 DAY)
           ${storeFilter}
-        GROUP BY DATE(created_at)
+        GROUP BY DATE(COALESCE(created_at, post_time))
         ORDER BY sale_date
       `).catch(() => []);
 
@@ -95,12 +95,12 @@ export class SalesForecastService {
     const weekly: Array<{ week_start: string; revenue: string; orders: string }> =
       await this.opsConnection.query(`
         SELECT
-          DATE(DATE_SUB(created_at, INTERVAL WEEKDAY(created_at) DAY)) AS week_start,
-          SUM(total_amount) AS revenue,
+          DATE(DATE_SUB(COALESCE(created_at, post_time), INTERVAL WEEKDAY(COALESCE(created_at, post_time)) DAY)) AS week_start,
+          SUM(COALESCE(total_amount, needPayMoney, 0)) AS revenue,
           COUNT(*) AS orders
         FROM jiamart_shop.sp_order
         WHERE payment_status = 'succeeded'
-          AND created_at >= DATE_SUB(CURDATE(), INTERVAL 180 DAY)
+          AND COALESCE(created_at, post_time) >= DATE_SUB(CURDATE(), INTERVAL 180 DAY)
           ${storeFilter}
         GROUP BY week_start
         ORDER BY week_start

@@ -31,19 +31,18 @@ export class InventoryForecastService {
     // 2. 如果没有手动配置，从 sp_goods 读商品列表兜底
     let skuList = configs;
     if (!skuList.length) {
-      const goods: Array<{ sku_no: string; goods_name: string; stock: string }> =
+      const goods: Array<{ id: number; name: string; stock: number }> =
         await this.opsConnection.query(`
-          SELECT sku_no, goods_name, stock
+          SELECT id, COALESCE(name, en_name, CONCAT('SKU-',id)) AS name, stock
           FROM jiamart_shop.sp_goods
-          WHERE is_on_sale = 1
           LIMIT 200
         `).catch(() => []);
 
       skuList = goods.map(g => ({
         id: 0,
         store_id: storeId ?? null,
-        sku_code: g.sku_no,
-        product_name: g.goods_name,
+        sku_code: String(g.id),
+        product_name: g.name,
         lead_time_days: 3,
         safety_stock_days: 2,
         avg_daily_usage: null,
@@ -53,12 +52,13 @@ export class InventoryForecastService {
     // 3. 对每个 SKU 计算日均用量（从过去 30 天销售推算）
     const salesBySkuRaw: Array<{ sku_no: string; total_qty: string }> =
       await this.opsConnection.query(`
-        SELECT oi.sku_no, SUM(oi.goods_num) AS total_qty
-        FROM jiamart_shop.sp_order_goods oi
-        JOIN jiamart_shop.sp_order o ON o.order_id = oi.order_id
+        SELECT g.id AS sku_no, SUM(od.num) AS total_qty
+        FROM jiamart_shop.sp_order_details od
+        JOIN jiamart_shop.sp_order o ON o.id = od.oid
+        JOIN jiamart_shop.sp_goods g ON g.id = od.gid
         WHERE o.payment_status = 'succeeded'
-          AND o.created_at >= DATE_SUB(CURDATE(), INTERVAL 30 DAY)
-        GROUP BY oi.sku_no
+          AND COALESCE(o.created_at, o.post_time) >= DATE_SUB(CURDATE(), INTERVAL 30 DAY)
+        GROUP BY od.gid
       `).catch(() => []);
 
     const skuSalesMap: Record<string, number> = {};
@@ -67,12 +67,12 @@ export class InventoryForecastService {
     }
 
     // 4. 拉当前库存（sp_goods.stock）
-    const stockRaw: Array<{ sku_no: string; stock: string }> =
+    const stockRaw: Array<{ id: number; stock: number }> =
       await this.opsConnection.query(`
-        SELECT sku_no, stock FROM jiamart_shop.sp_goods
+        SELECT id, stock FROM jiamart_shop.sp_goods
       `).catch(() => []);
     const stockMap: Record<string, number> = {};
-    for (const s of stockRaw) stockMap[s.sku_no] = parseFloat(s.stock) || 0;
+    for (const s of stockRaw) stockMap[String(s.id)] = s.stock ?? 0;
 
     // 5. 计算 reorder point + suggested qty
     return skuList.map(sku => {
