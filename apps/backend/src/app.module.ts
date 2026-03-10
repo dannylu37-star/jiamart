@@ -11,6 +11,7 @@ import { OpsModule } from './ops/ops.module';
 import { StoreModule } from './store/store.module';
 import { ScheduleContextModule } from './schedule-context/schedule-context.module';
 import { VendorModule } from './vendor/vendor.module';
+import { AiForecastModule } from './ai-forecast/ai-forecast.module';
 
 @Module({
   imports: [
@@ -71,6 +72,7 @@ import { VendorModule } from './vendor/vendor.module';
     StoreModule,
     ScheduleContextModule,
     VendorModule,
+    AiForecastModule,
   ],
 })
 export class AppModule {}
