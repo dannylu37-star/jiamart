@@ -29,17 +29,17 @@ export class SalesForecastService {
   async forecast7d(storeId?: number): Promise<SalesForecastDay[]> {
     // 拉过去 90 天销售，按星期几聚合均值 + 最近趋势
     const storeFilter = storeId ? `AND store_id = ${storeId}` : '';
+    // 优先用 EPOS 数据（线下POS，更完整）；无 store_id 过滤时用 _s1 (Burleigh St)
     const daily: Array<{ sale_date: string; revenue: string; orders: string }> =
       await this.opsConnection.query(`
         SELECT
-          DATE(COALESCE(created_at, post_time)) AS sale_date,
-          SUM(COALESCE(total_amount, needPayMoney, 0)) AS revenue,
+          DATE(FROM_UNIXTIME(pay_time)) AS sale_date,
+          SUM(total_money_after_discount) AS revenue,
           COUNT(*) AS orders
-        FROM jiamart_shop.sp_order
-        WHERE payment_status = 'succeeded'
-          AND COALESCE(created_at, post_time) >= DATE_SUB(CURDATE(), INTERVAL 90 DAY)
-          ${storeFilter}
-        GROUP BY DATE(COALESCE(created_at, post_time))
+        FROM jiamart_shop.sp_epos_order_s1
+        WHERE pay_time IS NOT NULL
+          AND FROM_UNIXTIME(pay_time) >= DATE_SUB(CURDATE(), INTERVAL 90 DAY)
+        GROUP BY DATE(FROM_UNIXTIME(pay_time))
         ORDER BY sale_date
       `).catch(() => []);
 
@@ -95,13 +95,12 @@ export class SalesForecastService {
     const weekly: Array<{ week_start: string; revenue: string; orders: string }> =
       await this.opsConnection.query(`
         SELECT
-          DATE(DATE_SUB(COALESCE(created_at, post_time), INTERVAL WEEKDAY(COALESCE(created_at, post_time)) DAY)) AS week_start,
-          SUM(COALESCE(total_amount, needPayMoney, 0)) AS revenue,
+          DATE(DATE_SUB(FROM_UNIXTIME(pay_time), INTERVAL WEEKDAY(FROM_UNIXTIME(pay_time)) DAY)) AS week_start,
+          SUM(total_money_after_discount) AS revenue,
           COUNT(*) AS orders
-        FROM jiamart_shop.sp_order
-        WHERE payment_status = 'succeeded'
-          AND COALESCE(created_at, post_time) >= DATE_SUB(CURDATE(), INTERVAL 180 DAY)
-          ${storeFilter}
+        FROM jiamart_shop.sp_epos_order_s1
+        WHERE pay_time IS NOT NULL
+          AND FROM_UNIXTIME(pay_time) >= DATE_SUB(CURDATE(), INTERVAL 180 DAY)
         GROUP BY week_start
         ORDER BY week_start
       `).catch(() => []);

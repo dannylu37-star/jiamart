@@ -22,7 +22,7 @@ export class StaffingForecastService {
 
   async forecast(storeId: number, days = 14): Promise<StaffingDay[]> {
     // 1. 拉过去 60 天的出勤数据，按 [星期几] 聚合平均人数
-    const rawAttendance: Array<{ dow: number; avg_staff: string }> = await this.opsConnection.query(`
+    let rawAttendance: Array<{ dow: number; avg_staff: string }> = await this.opsConnection.query(`
       SELECT
         DAYOFWEEK(DATE(a.clock_in)) - 1 AS dow,
         COUNT(DISTINCT a.staff_id) / COUNT(DISTINCT DATE(a.clock_in)) AS avg_staff
@@ -31,7 +31,24 @@ export class StaffingForecastService {
       WHERE a.clock_in >= DATE_SUB(CURDATE(), INTERVAL 60 DAY)
         AND (${storeId ? `s.store_id = ${storeId}` : '1=1'})
       GROUP BY dow
-    `);
+    `).catch(() => []);
+
+    // Fallback：考勤数据不足时，用 sp_day_tol 日报销售额反推（人均£180/天）
+    if (rawAttendance.length < 5) {
+      this.logger.log('Attendance data insufficient, falling back to day_tol sales-based estimate');
+      const dayTol: Array<{ dow: number; avg_sales: string }> = await this.opsConnection.query(`
+        SELECT
+          DAYOFWEEK(data_day) - 1 AS dow,
+          AVG(sales) AS avg_sales
+        FROM jiamart_shop.sp_day_tol_s1
+        WHERE data_day >= DATE_SUB(CURDATE(), INTERVAL 90 DAY)
+        GROUP BY dow
+      `).catch(() => []);
+      rawAttendance = dayTol.map(r => ({
+        dow: r.dow,
+        avg_staff: String(Math.max(2, Math.round(parseFloat(r.avg_sales) / 180))),
+      }));
+    }
 
     const dowAvg: Record<number, number> = {};
     for (const row of rawAttendance) {

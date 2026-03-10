@@ -31,18 +31,18 @@ export class InventoryForecastService {
     // 2. 如果没有手动配置，从 sp_goods 读商品列表兜底
     let skuList = configs;
     if (!skuList.length) {
-      const goods: Array<{ id: number; name: string; stock: number }> =
+      const goods: Array<{ id: number; name: string; en_name: string }> =
         await this.opsConnection.query(`
-          SELECT id, COALESCE(name, en_name, CONCAT('SKU-',id)) AS name, stock
-          FROM jiamart_shop.sp_goods
-          LIMIT 200
+          SELECT id, COALESCE(name, en_name, CONCAT('SKU-',id)) AS name, en_name
+          FROM jiamart_shop.sp_goods_s1
+          LIMIT 500
         `).catch(() => []);
 
       skuList = goods.map(g => ({
         id: 0,
         store_id: storeId ?? null,
         sku_code: String(g.id),
-        product_name: g.name,
+        product_name: g.name || g.en_name,
         lead_time_days: 3,
         safety_stock_days: 2,
         avg_daily_usage: null,
@@ -50,15 +50,17 @@ export class InventoryForecastService {
     }
 
     // 3. 对每个 SKU 计算日均用量（从过去 30 天销售推算）
+    // 用真实 EPOS 订单明细计算日均销量（优先用 Burleigh Street 数据）
     const salesBySkuRaw: Array<{ sku_no: string; total_qty: string }> =
       await this.opsConnection.query(`
-        SELECT g.id AS sku_no, SUM(od.num) AS total_qty
-        FROM jiamart_shop.sp_order_details od
-        JOIN jiamart_shop.sp_order o ON o.id = od.oid
-        JOIN jiamart_shop.sp_goods g ON g.id = od.gid
-        WHERE o.payment_status = 'succeeded'
-          AND COALESCE(o.created_at, o.post_time) >= DATE_SUB(CURDATE(), INTERVAL 30 DAY)
-        GROUP BY od.gid
+        SELECT 
+          d.product_id AS sku_no,
+          SUM(d.numbers) / 30 AS total_qty
+        FROM jiamart_shop.sp_epos_order_details_s1 d
+        JOIN jiamart_shop.sp_epos_order_s1 o ON o.id = d.epos_id
+        WHERE FROM_UNIXTIME(o.pay_time) >= DATE_SUB(CURDATE(), INTERVAL 30 DAY)
+          AND d.chinese_name != 'item'
+        GROUP BY d.product_id
       `).catch(() => []);
 
     const skuSalesMap: Record<string, number> = {};
@@ -69,7 +71,7 @@ export class InventoryForecastService {
     // 4. 拉当前库存（sp_goods.stock）
     const stockRaw: Array<{ id: number; stock: number }> =
       await this.opsConnection.query(`
-        SELECT id, stock FROM jiamart_shop.sp_goods
+        SELECT id, stock FROM jiamart_shop.sp_goods_s1
       `).catch(() => []);
     const stockMap: Record<string, number> = {};
     for (const s of stockRaw) stockMap[String(s.id)] = s.stock ?? 0;
