@@ -1,10 +1,14 @@
 import { Injectable, NotFoundException, Logger } from '@nestjs/common';
 import { InjectConnection } from '@nestjs/typeorm';
 import { Connection } from 'typeorm';
-import * as fs from 'fs';
 import * as path from 'path';
+import * as fs from 'fs';
+import { Storage } from '@google-cloud/storage';
 import { VendorOrderForm } from './entities/vendor-order-form.entity';
 import { VendorProduct } from './entities/vendor-product.entity';
+
+const GCS_BUCKET = process.env.GCS_BUCKET || 'jiamart-files';
+const storage = new Storage();
 
 @Injectable()
 export class VendorFormService {
@@ -14,11 +18,22 @@ export class VendorFormService {
 
   async saveUpload(vendorId: number, file: any): Promise<VendorOrderForm> {
     const repo = this.opsConnection.getRepository(VendorOrderForm);
+    let storagePath = file.path; // local path (used in dev)
+
+    // 生产环境上传到 GCS
+    if (process.env.NODE_ENV === 'production') {
+      const gcsPath = `vendor-forms/${vendorId}/${Date.now()}-${file.originalname}`;
+      await storage.bucket(GCS_BUCKET).upload(file.path, { destination: gcsPath });
+      storagePath = `gs://${GCS_BUCKET}/${gcsPath}`;
+      // 删除本地临时文件
+      try { fs.unlinkSync(file.path); } catch {}
+    }
+
     return repo.save(
       repo.create({
         vendor_id: vendorId,
         original_filename: file.originalname,
-        storage_path: file.path,
+        storage_path: storagePath,
         status: 'pending',
       }),
     );
@@ -36,13 +51,19 @@ export class VendorFormService {
 
     const ext = path.extname(form.original_filename).toLowerCase();
     let parsedData: VendorOrderForm['parsed_data'] = [];
+    let localPath = form.storage_path;
 
     try {
+      // 如果是 GCS 路径，先下载到 /tmp
+      if (form.storage_path.startsWith('gs://')) {
+        const gcsPath = form.storage_path.replace(`gs://${GCS_BUCKET}/`, '');
+        localPath = `/tmp/vendor-form-${formId}${ext}`;
+        await storage.bucket(GCS_BUCKET).file(gcsPath).download({ destination: localPath });
+      }
+
       if (ext === '.xlsx' || ext === '.xls') {
-        // TODO: install xlsx — npm install xlsx
-        // eslint-disable-next-line @typescript-eslint/no-var-requires
         const XLSX = require('xlsx');
-        const workbook = XLSX.readFile(form.storage_path);
+        const workbook = XLSX.readFile(localPath);
         const sheet = workbook.Sheets[workbook.SheetNames[0]];
         const rows: Record<string, string>[] = XLSX.utils.sheet_to_json(sheet, { defval: '' });
 
@@ -54,9 +75,14 @@ export class VendorFormService {
           lead_time_days: parseInt(String(row['配送时间(天)'] || row['Lead Time'] || '0')) || undefined,
         })).filter(r => r.product_name);
       } else if (ext === '.pdf') {
-        // TODO: PDF parsing — integrate pdf-parse or LLM-based extraction
+        // TODO: PDF 解析 — 接 LLM 或 pdf-parse
         this.logger.warn(`PDF parsing not yet implemented for form ${formId}`);
         parsedData = [];
+      }
+
+      // 清理临时文件
+      if (form.storage_path.startsWith('gs://')) {
+        try { fs.unlinkSync(localPath); } catch {}
       }
 
       await repo.update(formId, { status: 'parsed', parsed_data: parsedData });
