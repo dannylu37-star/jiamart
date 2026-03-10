@@ -10,7 +10,9 @@ const NAV = [
   { to: '/payroll',    icon: '💰', label: '薪资管理', roles: ['admin','superadmin'] },
   { to: '/stores',     icon: '🏪', label: '门店管理', roles: ['admin','superadmin'] },
   { to: '/sales',      icon: '💹', label: '营业额',   roles: ['admin','superadmin'] },
-  { to: '/goods',      icon: '🛒', label: '商品管理', roles: ['admin','superadmin'] },
+  { to: '/goods',        icon: '🛒', label: '商品管理', roles: ['admin','superadmin'] },
+  { to: '/vendors',      icon: '🏭', label: '供应商',   roles: ['admin','superadmin'] },
+  { to: '/ai-forecast',  icon: '✨', label: '智能建议', roles: ['manager','admin','superadmin'] },
 ]
 
 const ROLE_BADGE = {
