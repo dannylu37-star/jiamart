@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import api from '../api'
+import ScheduleContextBar from '../components/ScheduleContextBar'
 
 function getMondayOfWeek(date) {
   const d = new Date(date)
@@ -70,6 +71,8 @@ export default function Shifts() {
           + 新建排班
         </button>
       </div>
+
+      <ScheduleContextBar storeId={null} startDate={fmt(weekStart)} endDate={fmt(weekEnd)} />
 
       {/* Week nav */}
       <div className="flex items-center gap-4 mb-6">

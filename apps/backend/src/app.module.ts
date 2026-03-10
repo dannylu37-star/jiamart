@@ -9,6 +9,8 @@ import { StockModule } from './stock/stock.module';
 import { StaffModule } from './staff/staff.module';
 import { OpsModule } from './ops/ops.module';
 import { StoreModule } from './store/store.module';
+import { ScheduleContextModule } from './schedule-context/schedule-context.module';
+import { VendorModule } from './vendor/vendor.module';
 
 @Module({
   imports: [
@@ -67,6 +69,8 @@ import { StoreModule } from './store/store.module';
     StaffModule,
     OpsModule,
     StoreModule,
+    ScheduleContextModule,
+    VendorModule,
   ],
 })
 export class AppModule {}
