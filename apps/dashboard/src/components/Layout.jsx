@@ -12,6 +12,7 @@ const NAV = [
   { to: '/sales',      icon: '💹', label: '营业额',   roles: ['admin','superadmin'] },
   { to: '/goods',        icon: '🛒', label: '商品管理', roles: ['admin','superadmin'] },
   { to: '/vendors',      icon: '🏭', label: '供应商',   roles: ['admin','superadmin'] },
+  { to: '/analytics',    icon: '📊', label: '销售分析', roles: ['manager','admin','superadmin'] },
   { to: '/ai-forecast',  icon: '✨', label: '智能建议', roles: ['manager','admin','superadmin'] },
 ]
 

@@ -13,6 +13,7 @@ import Sales from './pages/Sales'
 import Goods from './pages/Goods'
 import AiForecast from './pages/AiForecast'
 import Vendors from './pages/Vendors'
+import Analytics from './pages/Analytics'
 
 function PrivateRoute({ children, roles }) {
   const { user, isAuthenticated } = useAuth()
@@ -39,6 +40,7 @@ function AppRoutes() {
         <Route path="sales" element={<PrivateRoute roles={['admin','superadmin']}><Sales /></PrivateRoute>} />
         <Route path="goods" element={<PrivateRoute roles={['admin','superadmin']}><Goods /></PrivateRoute>} />
         <Route path="ai-forecast" element={<PrivateRoute roles={['manager','admin','superadmin']}><AiForecast /></PrivateRoute>} />
+        <Route path="analytics" element={<PrivateRoute roles={['manager','admin','superadmin']}><Analytics /></PrivateRoute>} />
         <Route path="vendors" element={<PrivateRoute roles={['admin','superadmin']}><Vendors /></PrivateRoute>} />
       </Route>
       <Route path="*" element={<Navigate to="/" replace />} />

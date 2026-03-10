@@ -7,7 +7,7 @@ import { Connection } from 'typeorm';
 
 // Store coordinates — update to match actual store locations
 const STORE_COORDS: Record<number, { lat: number; lon: number }> = {
-  1: { lat: 51.5074, lon: -0.1278 }, // London
+  1: { lat: 52.2053, lon: 0.1218 }, // Cambridge (Burleigh St)
   2: { lat: 53.4808, lon: -2.2426 }, // Manchester
   3: { lat: 52.4862, lon: -1.8904 }, // Birmingham
   4: { lat: 55.9533, lon: -3.1883 }, // Edinburgh
