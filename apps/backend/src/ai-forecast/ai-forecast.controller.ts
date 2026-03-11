@@ -130,7 +130,7 @@ export class AiForecastController {
         ROUND(SUM(d.total_price_after_dis), 2)                 AS total_revenue,
         ROUND(SUM(d.numbers) / COUNT(DISTINCT DATE(FROM_UNIXTIME(o.pay_time))), 2) AS daily_avg
       FROM jiamart_shop.sp_epos_order_details_${suffix} d
-      JOIN jiamart_shop.sp_epos_order_${suffix} o ON o.id = d.epos_id
+      JOIN jiamart_shop.sp_epos_order_${suffix} o ON o.epos_id = d.epos_id
       WHERE FROM_UNIXTIME(o.pay_time) >= DATE_SUB(CURDATE(), INTERVAL ${d} DAY)
         AND d.chinese_name NOT IN ('item', '袋子', 'bag')
       GROUP BY d.product_id, d.chinese_name, d.english_name

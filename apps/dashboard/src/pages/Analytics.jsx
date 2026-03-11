@@ -42,8 +42,9 @@ export default function Analytics() {
 
   const totalRevenue  = daily.reduce((s, d) => s + parseFloat(d.sales || 0), 0)
   const avgDailyRev   = daily.length ? totalRevenue / daily.length : 0
-  const maxDay        = daily.reduce((a, b) => parseFloat(b.sales) > parseFloat(a.sales) ? b : a, { sales: 0, data_day: '-' })
+  const maxDay        = daily.length ? daily.reduce((a, b) => parseFloat(b.sales) > parseFloat(a.sales) ? b : a) : { sales: 0, data_day: '-' }
   const pmTotal       = parseFloat(paymentMix.total || 0)
+  const totalItemsSold = topProducts.reduce((s, p) => s + parseInt(p.total_qty || 0), 0)
 
   return (
     <div className="p-6 space-y-6">
@@ -76,7 +77,7 @@ export default function Analytics() {
             <KpiCard label="总收入" value={`£${(totalRevenue).toLocaleString('en-GB', {maximumFractionDigits:0})}`} sub={`${daily.length} 天`} color="orange" />
             <KpiCard label="日均营业额" value={`£${avgDailyRev.toFixed(0)}`} sub="按营业日" color="blue" />
             <KpiCard label="最高单日" value={`£${parseFloat(maxDay.sales||0).toFixed(0)}`} sub={maxDay.data_day} color="green" />
-            <KpiCard label="订单总量" value={topProducts.reduce((s,p)=>s+parseInt(p.total_qty||0),0).toLocaleString()} sub="件商品售出" color="purple" />
+            <KpiCard label="商品售出" value={totalItemsSold.toLocaleString()} sub={`${topProducts.length} 个SKU`} color="purple" />
           </div>
 
           {/* 日报趋势图 */}
@@ -195,12 +196,15 @@ function SalesBarChart({ data }) {
   if (data.length > 60) {
     const weeks = {}
     data.forEach(d => {
-      const dt = new Date(d.data_day)
-      const weekKey = new Date(dt.setDate(dt.getDate() - dt.getDay())).toISOString().split('T')[0]
+      const dt = new Date(d.data_day + 'T12:00:00')
+      const day = dt.getDay()
+      const weekStart = new Date(dt)
+      weekStart.setDate(dt.getDate() - day)
+      const weekKey = weekStart.toISOString().split('T')[0]
       if (!weeks[weekKey]) weeks[weekKey] = { data_day: weekKey, sales: 0 }
       weeks[weekKey].sales += parseFloat(d.sales || 0)
     })
-    chartData = Object.values(weeks)
+    chartData = Object.values(weeks).sort((a, b) => a.data_day.localeCompare(b.data_day))
   }
 
   const maxSales = Math.max(...chartData.map(d => parseFloat(d.sales || 0)), 1)

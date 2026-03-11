@@ -57,7 +57,7 @@ export class InventoryForecastService {
           d.product_id AS sku_no,
           SUM(d.numbers) / 30 AS total_qty
         FROM jiamart_shop.sp_epos_order_details_s1 d
-        JOIN jiamart_shop.sp_epos_order_s1 o ON o.id = d.epos_id
+        JOIN jiamart_shop.sp_epos_order_s1 o ON o.epos_id = d.epos_id
         WHERE FROM_UNIXTIME(o.pay_time) >= DATE_SUB(CURDATE(), INTERVAL 30 DAY)
           AND d.chinese_name != 'item'
         GROUP BY d.product_id
